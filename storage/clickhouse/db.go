@@ -1,12 +1,10 @@
 package clickhouse
 
 import (
-	"context"
 	"crypto/tls"
 	"database/sql"
 	"embed"
 	"fmt"
-	"net"
 	"os"
 	"time"
 
@@ -33,13 +31,12 @@ func NewClickhouseBackend(readonly bool) (*ClickhouseBackend, error) {
 			Username: os.Getenv("CLICKHOUSE_USER"),
 			Password: os.Getenv("CLICKHOUSE_PASSWORD"),
 		},
-		DialContext: func(ctx context.Context, addr string) (net.Conn, error) {
-			var d net.Dialer
-			return d.DialContext(ctx, "tcp", addr)
-		},
 		Debug: true,
 		Debugf: func(format string, v ...any) {
 			log.Debug().Msgf(format, v...)
+		},
+		TLS: &tls.Config{
+			InsecureSkipVerify: true,
 		},
 		Settings: clickhouse.Settings{
 			"max_execution_time": 60,
@@ -63,6 +60,11 @@ func NewClickhouseBackend(readonly bool) (*ClickhouseBackend, error) {
 			},
 		},
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	v, err := conn.ServerVersion()
 	if err != nil {
 		return nil, err
 	}
@@ -101,6 +103,7 @@ func NewClickhouseBackend(readonly bool) (*ClickhouseBackend, error) {
 	connSql.SetConnMaxLifetime(time.Hour)
 
 	log.Info().
+		Str("version", v.Version.String()).
 		Msg("Database opened")
 
 	backend := &ClickhouseBackend{
