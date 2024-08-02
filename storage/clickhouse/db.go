@@ -11,12 +11,14 @@ import (
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/RaghavSood/smoltx/smollogger"
 	"github.com/pressly/goose/v3"
-	"github.com/rs/zerolog/log"
 )
 
 //go:embed migrations/*
 var embeddedMigrations embed.FS
+
+var log = smollogger.NewLogger("clickhouse")
 
 type ClickhouseBackend struct {
 	db    clickhouse.Conn
@@ -37,7 +39,7 @@ func NewClickhouseBackend(readonly bool) (*ClickhouseBackend, error) {
 		},
 		Debug: true,
 		Debugf: func(format string, v ...any) {
-			fmt.Printf(format+"\n", v...)
+			log.Debug().Msgf(format, v...)
 		},
 		Settings: clickhouse.Settings{
 			"max_execution_time": 60,
