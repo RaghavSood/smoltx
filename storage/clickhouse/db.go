@@ -1,4 +1,4 @@
-package sqlite
+package clickhouse
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/pressly/goose/v3"
 	"github.com/rs/zerolog/log"
 )
 
@@ -18,20 +19,19 @@ import (
 var embeddedMigrations embed.FS
 
 type ClickhouseBackend struct {
-	db    *clickhouse.Conn
+	db    clickhouse.Conn
 	sqlDb *sql.DB
 }
 
 func NewClickhouseBackend(readonly bool) (*ClickhouseBackend, error) {
 	conn, err := clickhouse.Open(&clickhouse.Options{
-		Addr: fmt.Sprintf("%s:%d", os.Getenv("CLICKHOUSE_HOST"), os.Getenv("CLICKHOUSE_PORT")),
+		Addr: []string{fmt.Sprintf("%s:%s", os.Getenv("CLICKHOUSE_HOST"), os.Getenv("CLICKHOUSE_PORT"))},
 		Auth: clickhouse.Auth{
 			Database: os.Getenv("CLICKHOUSE_DATABASE"),
 			Username: os.Getenv("CLICKHOUSE_USER"),
 			Password: os.Getenv("CLICKHOUSE_PASSWORD"),
 		},
 		DialContext: func(ctx context.Context, addr string) (net.Conn, error) {
-			dialCount++
 			var d net.Dialer
 			return d.DialContext(ctx, "tcp", addr)
 		},
@@ -62,11 +62,11 @@ func NewClickhouseBackend(readonly bool) (*ClickhouseBackend, error) {
 		},
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	connSql := clickhouse.OpenDB(&clickhouse.Options{
-		Addr: fmt.Sprintf("%s:%d", os.Getenv("CLICKHOUSE_HOST"), os.Getenv("CLICKHOUSE_PORT")),
+		Addr: []string{fmt.Sprintf("%s:%s", os.Getenv("CLICKHOUSE_HOST"), os.Getenv("CLICKHOUSE_PORT"))},
 		Auth: clickhouse.Auth{
 			Database: os.Getenv("CLICKHOUSE_DATABASE"),
 			Username: os.Getenv("CLICKHOUSE_USER"),
@@ -115,17 +115,17 @@ func NewClickhouseBackend(readonly bool) (*ClickhouseBackend, error) {
 	return backend, nil
 }
 
-func (d *SqliteBackend) Close() error {
+func (d *ClickhouseBackend) Close() error {
 	return d.db.Close()
 }
 
-func (d *SqliteBackend) Migrate() error {
+func (d *ClickhouseBackend) Migrate() error {
 	goose.SetBaseFS(embeddedMigrations)
 	if err := goose.SetDialect("clickhouse"); err != nil {
 		return fmt.Errorf("failed to set goose dialect: %w", err)
 	}
 
-	if err := goose.Up(d.db, "migrations"); err != nil {
+	if err := goose.Up(d.sqlDb, "migrations"); err != nil {
 		return fmt.Errorf("failed to run goose up: %w", err)
 	}
 	return nil
