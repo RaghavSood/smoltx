@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 
+	"github.com/RaghavSood/smoltx/storage/clickhouse"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -19,4 +20,9 @@ func init() {
 }
 
 func main() {
+	_, err := clickhouse.NewClickhouseBackend(noindex)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to initialize storage backend")
+	}
+
 }
